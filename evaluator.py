@@ -5,7 +5,8 @@ from langfuse import get_client
 from openai import OpenAI
 import os
 import json
-
+from dotenv import load_dotenv
+load_dotenv()
 langfuse = get_client()
 openai_client = OpenAI()
 
@@ -172,6 +173,7 @@ def run():
         if is_fallback(str(trace["output"])):
             skipped_fallback += 1
             continue
+        print(f"🔍 Evaluating trace {trace['trace_id']}...")
 
         try:
             scores = evaluate_trace(
