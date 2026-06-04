@@ -1,0 +1,23 @@
+services:
+  ofelia:
+    image: mcuadros/ofelia:latest
+    depends_on:
+      - evaluator
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./logs/ofelia:/var/log/ofelia
+    environment:
+      - TZ=Asia/Kolkata
+
+  evaluator:
+    build: .
+    env_file: .env
+    restart: always
+    container_name: evaluator
+    command: sleep infinity
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-exec.evaluator.schedule: "0 0 16 * * *"
+      ofelia.job-exec.evaluator.command: "python evaluator.py"
+      ofelia.job-exec.evaluator.save-only-on-error: "true"

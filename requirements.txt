@@ -1,0 +1,4 @@
+langfuse
+openai
+requests
+python-dotenv

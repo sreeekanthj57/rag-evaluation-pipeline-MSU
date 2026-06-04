@@ -1,0 +1,11 @@
+# Logs
+logs/*
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.sixth
