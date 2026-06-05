@@ -12,7 +12,7 @@ openai_client = OpenAI()
 
 FALLBACK_MESSAGE = "So sorry, I don't have that info just yet."
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
-
+LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", 1))
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ def send_to_n8n(payload: dict):
 
 def run():
     end = datetime.now(timezone.utc)
-    start = end - timedelta(days=1)
+    start = end - timedelta(days=LOOKBACK_DAYS)
     run_date = end.strftime("%Y-%m-%d")
 
     print(f"🔄 [{run_date}] Fetching traces from Langfuse...")

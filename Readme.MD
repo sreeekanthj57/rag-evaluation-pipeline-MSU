@@ -30,6 +30,7 @@ LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
 LANGFUSE_SECRET_KEY=your_langfuse_secret_key
 LANGFUSE_HOST=https://cloud.langfuse.com
 N8N_WEBHOOK_URL=your_n8n_webhook_url
+LOOKBACK_DAYS=1
 ```
 
 3. Start the services:
@@ -58,5 +59,5 @@ Runs every day at **midnight Malaysian time (MYT / UTC+8)**.
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
-└── .env                # Not committed
+└── .env               # Environment variables
 ```
