@@ -10,7 +10,7 @@ load_dotenv()
 langfuse = get_client()
 openai_client = OpenAI()
 
-FALLBACK_MESSAGE = "So sorry, I don't have that info just yet."
+FALLBACK_MESSAGE = "I don't have that info on hand right now."
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", 1))
 
