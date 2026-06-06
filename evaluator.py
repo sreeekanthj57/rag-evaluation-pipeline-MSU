@@ -10,7 +10,11 @@ load_dotenv()
 langfuse = get_client()
 openai_client = OpenAI()
 
-FALLBACK_MESSAGE = "I don't have that info on hand right now."
+FALLBACK_PATTERNS = (
+    "I don't have that info on hand right now",
+    "So sorry, I don't have",
+    "Hmm, that's not something I can help with",
+)
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", 1))
 
@@ -26,7 +30,7 @@ def extract_retrieved_context(system_prompt: str) -> str | None:
 
 
 def is_fallback(output: str) -> bool:
-    return FALLBACK_MESSAGE in str(output)
+    return any(pattern in str(output) for pattern in FALLBACK_PATTERNS)
 
 
 # ── Fetch ──────────────────────────────────────────────────────────────────────
