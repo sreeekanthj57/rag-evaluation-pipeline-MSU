@@ -22,7 +22,7 @@ LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", 1))
 
 def extract_retrieved_context(system_prompt: str) -> str | None:
     match = re.search(
-        r"RETRIEVED CONTEXT\s*[─]+\s*(.*?)\s*[─]+\s*CONVERSATION HISTORY",
+        r"RETRIEVED CONTEXT\s*\n+═+\s*\n+(.*?)\s*═+\s*\n+CONVERSATION HISTORY",
         system_prompt,
         re.DOTALL
     )
