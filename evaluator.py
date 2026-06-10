@@ -190,7 +190,7 @@ def run():
         start_time=start,
         end_time=end,
         limit=50,
-        trace_name="Rahul Agent v3 - Retrieval & chunking Optimisation",
+        trace_name="Rahul Agent v5 -Multi-query handling",
     )
 
     print(f"📦 Fetched {len(traces)} traces")
