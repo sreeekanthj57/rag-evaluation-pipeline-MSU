@@ -16,6 +16,7 @@ FALLBACK_PATTERNS = (
     "I don't have that info on hand right now",
     "So sorry, I don't have",
     "Hmm, that's not something I can help with",
+    "I don't have specific information",
     # Malay
     "Saya tidak mempunyai maklumat",
     "saya tidak mempunyai butiran",
@@ -134,19 +135,28 @@ RETRIEVED CONTEXT (source of truth):
 AI RESPONSE:
 {output}
 
-Step 1 — Check if the student message is vague (single word, short affirmation, filler e.g. "ya", "ok", "yes", "iya", "sure", "noted", or anything under 3 words with no clear question intent).
+Step 1 — Classify the student message into ONE of three types:
 
-If the student message IS vague:
-- Set answer_relevance to 0.8 — do not judge relevance, the AI was responding to conversation history not visible here.
-- Evaluate ONLY faithfulness and correctness against the retrieved context.
+TYPE A — CONVERSATIONAL: No information is being sought. Examples: "It's okay", "It's been days",
+"Thank you", "I see", "Alright", "Okay", general small talk, emotional expressions, or any statement
+that is not requesting facts or university-related information.
+→ Set faithfulness=1.0, correctness=1.0, answer_relevance=1.0. No further evaluation needed.
 
-If the student message is NOT vague:
-- Evaluate all three criteria normally.
+TYPE B — VAGUE: Single word, short affirmation, or filler with no clear question intent.
+Examples: "ya", "ok", "yes", "iya", "sure", "noted", anything under 3 words.
+→ Set answer_relevance=0.8. Evaluate ONLY faithfulness and correctness against retrieved context.
+
+TYPE C — SUBSTANTIVE QUESTION: A clear question or request for university-related information.
+→ Evaluate all three criteria normally.
 
 Evaluate on:
-1. FAITHFULNESS (0-1): Is every claim in the AI response supported by the retrieved context? Penalize hallucinations or invented facts.
-2. ANSWER_RELEVANCE (0-1): Does the response address the student's question? Skip if input is vague — set to 1.0.
-3. CORRECTNESS (0-1): Is the information in the AI response factually correct based on the retrieved context?
+1. FAITHFULNESS (0-1): Are all claims in the AI response grounded in the retrieved context?
+   Penalise anything invented or not present in the context (hallucination detection).
+
+2. ANSWER_RELEVANCE (0-1): Does the response actually address what the student asked?
+
+3. CORRECTNESS (0-1): Did the AI interpret the context accurately and give the right answer?
+   Penalise misread values, incomplete answers, or errors in reasoning based on the context.
 
 Respond ONLY with a valid JSON object, no extra text:
 {{
@@ -214,17 +224,17 @@ def run():
                 output=str(trace["output"]),
                 retrieved_context=trace["retrieved_context"],
             )
-            f = scores["faithfulness"]
-            r = scores["answer_relevance"]
-            c = scores["correctness"]
-            overall = round((f + r + c) / 3, 2)
+            f_score = scores["faithfulness"]
+            r_score = scores["answer_relevance"]
+            c_score = scores["correctness"]
+            overall = round((f_score + r_score + c_score) / 3, 2)
 
-            faithfulness_scores.append(f)
-            relevance_scores.append(r)
-            correctness_scores.append(c)
+            faithfulness_scores.append(f_score)
+            relevance_scores.append(r_score)
+            correctness_scores.append(c_score)
             evaluated += 1
 
-            print(f"✅ {trace['trace_id']} — F:{f} R:{r} C:{c} Overall:{overall}")
+            print(f"✅ {trace['trace_id']} — F:{f_score} R:{r_score} C:{c_score} Overall:{overall}")
 
         except Exception as e:
             print(f"⚠️  {trace['trace_id']} — eval failed: {e}")
@@ -257,6 +267,7 @@ def run():
     print(f"   Overall:          {avg_overall}")
 
     send_to_n8n({"summary": summary})
+
 
 if __name__ == "__main__":
     run()
