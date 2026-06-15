@@ -31,6 +31,7 @@ LANGFUSE_SECRET_KEY=your_langfuse_secret_key
 LANGFUSE_HOST=https://cloud.langfuse.com
 N8N_WEBHOOK_URL=your_n8n_webhook_url
 LOOKBACK_DAYS=1
+TRACE_NAME=your_trace_name
 ```
 
 3. Start the services:

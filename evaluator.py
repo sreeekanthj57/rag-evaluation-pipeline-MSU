@@ -1,4 +1,5 @@
 import re
+import csv
 import requests
 from datetime import datetime, timedelta, timezone
 from langfuse import get_client
@@ -13,20 +14,16 @@ openai_client = OpenAI()
 
 FALLBACK_PATTERNS = (
     # English
-    "I don't have that info on hand right now",
-    "So sorry, I don't have",
     "Hmm, that's not something I can help with",
-    "I don't have specific information",
+    "I don't have",
     # Malay
-    "Saya tidak mempunyai maklumat",
-    "saya tidak mempunyai butiran",
-    "Maaf, saya tidak",
-    "tiada maklumat",
-    "tidak mempunyai maklumat khusus",
+    "Hmm, itu bukan sesuatu yang boleh saya bantu."
+    "Saya tiada"
 )
 
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", 1))
+TRACE_NAME = os.getenv("TRACE_NAME", "msu evaluator xxxxxxxxxxxxxxxxxxxxxxxxx")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -200,7 +197,7 @@ def run():
         start_time=start,
         end_time=end,
         limit=50,
-        trace_name="Rahul Agent v5 -Multi-query handling",
+        trace_name=TRACE_NAME,
     )
 
     print(f"📦 Fetched {len(traces)} traces")
@@ -257,6 +254,7 @@ def run():
         "avg_answer_relevance": avg_relevance,
         "avg_correctness": avg_correctness,
         "avg_overall": avg_overall,
+        "trace_name": TRACE_NAME
     }
 
     print(f"\n📊 Summary for {run_date}")
