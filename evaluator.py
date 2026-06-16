@@ -25,21 +25,15 @@ N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", 1))
 TRACE_NAME = os.getenv("TRACE_NAME", "msu evaluator xxxxxxxxxxxxxxxxxxxxxxxxx")
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def extract_retrieved_context(system_prompt: str) -> str | None:
+def extract_retrieved_context(user_message: str) -> str | None:
     match = re.search(
-        r"## Retrieved Context\n+"
-        r"The following chunks.*?\n+"
-        r"(.*?)"
-        r"\n+---\n+"
-        r"## Conversation History",
-        system_prompt,
+        r"Retrieve Context from Knowledge base.*?:\s*\n+(.*?)\n+---\n+Conversation History",
+        user_message,
         re.DOTALL,
     )
     return match.group(1).strip() if match else None
-
 
 def is_fallback(output: str) -> bool:
     return any(pattern in str(output) for pattern in FALLBACK_PATTERNS)
@@ -74,10 +68,10 @@ def fetch_traces(limit=50, start_time=None, end_time=None, trace_name=None):
                     continue
 
                 has_msu_prompt = any(
-                    isinstance(m, dict) and
-                    "You are a friendly student services assistant for Management and Science University" in str(m.get("content", ""))
-                    for m in obs_input
-                )
+                        isinstance(m, dict) and
+                        "You are a student assistant chatbot for Management and Science University" in str(m.get("content", ""))
+                        for m in obs_input
+                    )
                 if not has_msu_prompt:
                     continue
 
@@ -85,7 +79,7 @@ def fetch_traces(limit=50, start_time=None, end_time=None, trace_name=None):
                 ai_output = getattr(full_trace, "output", None)
 
                 system_prompt = next(
-                    (m.get("content", "") for m in obs_input if isinstance(m, dict) and m.get("role") == "assistant"),
+                    (m.get("content", "") for m in obs_input if isinstance(m, dict) and m.get("role") == "user"),
                     None,
                 )
                 if not system_prompt:
