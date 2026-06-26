@@ -8,6 +8,7 @@ import os
 import json
 from dotenv import load_dotenv
 load_dotenv()
+import time
 
 langfuse = get_client()
 openai_client = OpenAI()
@@ -97,8 +98,6 @@ def fetch_traces(limit=50, start_time=None, end_time=None, trace_name=None):
             to_timestamp=end_time,
             name=trace_name,
         )
-        import time
-        print(f"📄 Fetched page {page} with {len(traces_response.data)} traces")
         for trace in traces_response.data:
             time.sleep(1.5)
             full_trace = langfuse.api.trace.get(trace.id)
