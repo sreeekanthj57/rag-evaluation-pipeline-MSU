@@ -25,6 +25,9 @@ N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", 1))
 TRACE_NAME = os.getenv("TRACE_NAME", "msu evaluator xxxxxxxxxxxxxxxxxxxxxxxxx")
 
+HISTORY_TURNS = 3  # number of recent user messages to extract for context
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def extract_retrieved_context(user_message: str) -> str | None:
@@ -34,6 +37,47 @@ def extract_retrieved_context(user_message: str) -> str | None:
         re.DOTALL,
     )
     return match.group(1).strip() if match else None
+
+
+def extract_recent_user_turns(user_message: str, n: int = HISTORY_TURNS) -> str:
+    """
+    Extracts the last `n` user messages from the Conversation History block
+    in the system prompt. Returns them as a compact numbered string like:
+        [2 turns ago] Can I apply without SPM?
+        [1 turn ago]  What about Foundation?
+    Returns empty string if the block is not found or has no human turns.
+    """
+    # Pull the raw conversation history block
+    match = re.search(
+        r"Conversation History.*?:\s*\n+(.*?)(?:\n+---|$)",
+        user_message,
+        re.DOTALL,
+    )
+    if not match:
+        return ""
+
+    history_raw = match.group(1).strip()
+
+    # Support both "Human:" and "user:" prefixes (Flowise uses Human:)
+    human_pattern = re.compile(
+        r"(?:Human|User|human|user)\s*:\s*(.+?)(?=(?:Human|User|human|user|AI|Assistant|assistant)\s*:|$)",
+        re.DOTALL,
+    )
+    turns = [m.strip() for m in human_pattern.findall(history_raw) if m.strip()]
+
+    if not turns:
+        return ""
+
+    recent = turns[-n:]  # last n user messages
+    lines = []
+    for i, turn in enumerate(recent):
+        # Collapse multiline turns to a single line
+        single_line = " ".join(turn.split())
+        label = f"[{len(recent) - i} turn(s) ago]" if i < len(recent) - 1 else "[previous turn]"
+        lines.append(f"{label} {single_line}")
+
+    return "\n".join(lines)
+
 
 def is_fallback(output: str) -> bool:
     return any(pattern in str(output) for pattern in FALLBACK_PATTERNS)
@@ -53,8 +97,10 @@ def fetch_traces(limit=50, start_time=None, end_time=None, trace_name=None):
             to_timestamp=end_time,
             name=trace_name,
         )
-
+        import time
+        print(f"📄 Fetched page {page} with {len(traces_response.data)} traces")
         for trace in traces_response.data:
+            time.sleep(1.5)
             full_trace = langfuse.api.trace.get(trace.id)
             observations_response = langfuse.api.legacy.observations_v1.get_many(
                 trace_id=trace.id,
@@ -68,10 +114,10 @@ def fetch_traces(limit=50, start_time=None, end_time=None, trace_name=None):
                     continue
 
                 has_msu_prompt = any(
-                        isinstance(m, dict) and
-                        "You are a student assistant chatbot for Management and Science University" in str(m.get("content", ""))
-                        for m in obs_input
-                    )
+                    isinstance(m, dict) and
+                    "You are a student assistant chatbot for Management and Science University" in str(m.get("content", ""))
+                    for m in obs_input
+                )
                 if not has_msu_prompt:
                     continue
 
@@ -86,6 +132,7 @@ def fetch_traces(limit=50, start_time=None, end_time=None, trace_name=None):
                     continue
 
                 retrieved_context = extract_retrieved_context(system_prompt)
+                recent_history = extract_recent_user_turns(system_prompt, n=HISTORY_TURNS)
 
                 if not all([student_input, ai_output, retrieved_context]):
                     continue
@@ -95,7 +142,9 @@ def fetch_traces(limit=50, start_time=None, end_time=None, trace_name=None):
                     "input": student_input,
                     "output": ai_output,
                     "retrieved_context": retrieved_context,
+                    "recent_history": recent_history,
                 })
+                print(f"   ✅ Trace {trace.id} added for evaluation")
                 break
 
         if len(traces_response.data) < limit:
@@ -107,7 +156,12 @@ def fetch_traces(limit=50, start_time=None, end_time=None, trace_name=None):
 
 # ── Evaluate ───────────────────────────────────────────────────────────────────
 
-def evaluate_trace(input: str, output: str, retrieved_context: str) -> dict:
+def evaluate_trace(input: str, output: str, retrieved_context: str, recent_history: str = "") -> dict:
+    history_section = f"""
+RECENT CONVERSATION (last {HISTORY_TURNS} student messages before the current one):
+{recent_history}
+""" if recent_history else ""
+
     prompt = f"""You are an evaluator for a university chatbot.
 Your job is to assess whether the AI's response is grounded in the retrieved context.
 
@@ -117,7 +171,13 @@ When evaluating, compare meaning and semantics across languages — do NOT penal
 simply because it is in a different language from the context. If a Malay claim is a faithful
 translation or restatement of content in the English context, it counts as supported.
 
-STUDENT MESSAGE:
+IMPORTANT — CONVERSATIONAL CONTEXT:
+The student message below may be a short follow-up (e.g. "?", "do you need all this?", "ok",
+"yes") that only makes sense in the context of prior messages.
+When the student message is ambiguous, use the recent conversation history below to determine
+what topic is being discussed before evaluating the AI response.
+{history_section}
+STUDENT MESSAGE (current):
 {input}
 
 RETRIEVED CONTEXT (source of truth):
@@ -133,18 +193,22 @@ TYPE A — CONVERSATIONAL: No information is being sought. Examples: "It's okay"
 that is not requesting facts or university-related information.
 → Set faithfulness=1.0, correctness=1.0, answer_relevance=1.0. No further evaluation needed.
 
-TYPE B — VAGUE: Single word, short affirmation, or filler with no clear question intent.
-Examples: "ya", "ok", "yes", "iya", "sure", "noted", anything under 3 words.
-→ Set answer_relevance=0.8. Evaluate ONLY faithfulness and correctness against retrieved context.
+TYPE B — VAGUE: Single word, short affirmation, single punctuation mark (e.g. "?", "??"),
+or filler with no clear standalone question intent. Also applies to any short follow-up message
+(under 5 words) that is only interpretable in the context of prior conversation.
+Examples: "ya", "ok", "yes", "iya", "sure", "noted", "?", "do you need all this?".
+→ Use the RECENT CONVERSATION to infer the topic. Set answer_relevance=1.0.
+  Evaluate ONLY faithfulness and correctness against the retrieved context.
 
-TYPE C — SUBSTANTIVE QUESTION: A clear question or request for university-related information.
+TYPE C — SUBSTANTIVE QUESTION: A clear, self-contained question or request for university info.
 → Evaluate all three criteria normally.
 
 Evaluate on:
 1. FAITHFULNESS (0-1): Are all claims in the AI response grounded in the retrieved context?
    Penalise anything invented or not present in the context (hallucination detection).
 
-2. ANSWER_RELEVANCE (0-1): Does the response actually address what the student asked?
+2. ANSWER_RELEVANCE (0-1): Does the response address what the student asked (or implied via
+   conversation history for TYPE B)? Penalise off-topic or tangential answers.
 
 3. CORRECTNESS (0-1): Did the AI interpret the context accurately and give the right answer?
    Penalise misread values, incomplete answers, or errors in reasoning based on the context.
@@ -214,6 +278,7 @@ def run():
                 input=str(trace["input"]),
                 output=str(trace["output"]),
                 retrieved_context=trace["retrieved_context"],
+                recent_history=trace.get("recent_history", ""),
             )
             f_score = scores["faithfulness"]
             r_score = scores["answer_relevance"]
