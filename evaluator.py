@@ -176,6 +176,7 @@ The student message below may be a short follow-up (e.g. "?", "do you need all t
 When the student message is ambiguous, use the recent conversation history below to determine
 what topic is being discussed before evaluating the AI response.
 {history_section}
+
 STUDENT MESSAGE (current):
 {input}
 
@@ -184,23 +185,6 @@ RETRIEVED CONTEXT (source of truth):
 
 AI RESPONSE:
 {output}
-
-Step 1 — Classify the student message into ONE of three types:
-
-TYPE A — CONVERSATIONAL: No information is being sought. Examples: "It's okay", "It's been days",
-"Thank you", "I see", "Alright", "Okay", general small talk, emotional expressions, or any statement
-that is not requesting facts or university-related information.
-→ Set faithfulness=1.0, correctness=1.0, answer_relevance=1.0. No further evaluation needed.
-
-TYPE B — VAGUE: Single word, short affirmation, single punctuation mark (e.g. "?", "??"),
-or filler with no clear standalone question intent. Also applies to any short follow-up message
-(under 5 words) that is only interpretable in the context of prior conversation.
-Examples: "ya", "ok", "yes", "iya", "sure", "noted", "?", "do you need all this?".
-→ Use the RECENT CONVERSATION to infer the topic. Set answer_relevance=1.0.
-  Evaluate ONLY faithfulness and correctness against the retrieved context.
-
-TYPE C — SUBSTANTIVE QUESTION: A clear, self-contained question or request for university info.
-→ Evaluate all three criteria normally.
 
 Evaluate on:
 1. FAITHFULNESS (0-1): Are all claims in the AI response grounded in the retrieved context?
